@@ -92,16 +92,21 @@ jobs:
           const file = 'pnpm-workspace.yaml';
           const approved = ['core-js', 'esbuild', 'nodemon'];
           let text = fs.existsSync(file) ? fs.readFileSync(file, 'utf8') : '';
-          text = text.replace(/^allowBuilds:\n(?:[ \t].*(?:\n|$))*/m, '');
+          text = text.replace(/^onlyBuiltDependencies:\n(?:[ \t].*(?:\n|$))*/m, '');
           if (!/^packages:/m.test(text)) {
             text = `packages:\n  - .\n${text.trim() ? `\n${text.trimStart()}` : ''}`;
           }
-          const existing = new Set([...text.matchAll(/^\s*-\s+([^\s#]+)/gm)].map((match) => match[1]));
-          const missing = approved.filter((name) => !existing.has(name));
-          if (!/^onlyBuiltDependencies:/m.test(text)) {
-            text = `${text.replace(/\s*$/, '')}\nonlyBuiltDependencies:\n${approved.map((name) => `  - ${name}`).join('\n')}\n`;
-          } else if (missing.length) {
-            text = text.replace(/^onlyBuiltDependencies:\n/m, `onlyBuiltDependencies:\n${missing.map((name) => `  - ${name}\n`).join('')}`);
+          if (!/^allowBuilds:/m.test(text)) {
+            text = `${text.replace(/\s*$/, '')}\nallowBuilds:\n`;
+          }
+          for (const name of approved) {
+            const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            const pattern = new RegExp(`^(\\s*${escaped}\\s*:\\s*).*$`, 'm');
+            if (pattern.test(text)) {
+              text = text.replace(pattern, `$1true`);
+            } else {
+              text = text.replace(/^allowBuilds:\n/m, `allowBuilds:\n  ${name}: true\n`);
+            }
           }
           fs.writeFileSync(file, text);
           NODE
