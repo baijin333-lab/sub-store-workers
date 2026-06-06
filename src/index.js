@@ -137,16 +137,25 @@ export default {
             console.log(`Sub-Store Workers v${version} handling: ${request.method} ${pathname}`);
 
             // /share/ 路由的 token 验证（与上游 Node.js 版 be_merge 行为一致）
-            if (pathname.startsWith('/share/') && url.searchParams.has('token')) {
+            // 所有 /share/ 请求都必须携带有效 token，未分享的订阅/文件不可直接访问
+            if (pathname.startsWith('/share/')) {
                 if (request.method.toUpperCase() !== 'GET') {
                     return new Response(JSON.stringify({ status: 'failed', message: 'Method not allowed' }), {
                         status: 405,
                         headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
                     });
                 }
+                const tokenValue = url.searchParams.get('token');
+                if (!tokenValue) {
+                    // 未提供 token，拒绝访问
+                    return new Response(JSON.stringify({ status: 'failed', message: 'Share token is required' }), {
+                        status: 403,
+                        headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
+                    });
+                }
                 const decodedPathname = decodeURIComponent(pathname);
                 const shareToken = consumeShareToken({
-                    token: url.searchParams.get('token'),
+                    token: tokenValue,
                     pathname: decodedPathname,
                 });
                 if (!shareToken) {
